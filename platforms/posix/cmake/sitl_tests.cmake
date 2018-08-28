@@ -20,7 +20,10 @@ set(tests
 	mathlib
 	matrix
 	mavlink
-	mc_pos_control
+	microbench_hrt
+	microbench_math
+	microbench_matrix
+	microbench_uorb
 	mixer
 	param
 	parameters
@@ -63,7 +66,6 @@ endforeach()
 set(test_cmds
 	hello
 	hrt_test
-	muorb_test
 	vcdev_test
 	wqueue_test
 	)

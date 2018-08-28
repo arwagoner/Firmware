@@ -182,6 +182,13 @@ public:
 	float		get_acceptance_radius();
 
 	/**
+	 * Get the default altitude acceptance radius (i.e. from parameters)
+	 *
+	 * @return the distance from the target altitude before considering the waypoint reached
+	 */
+	float		get_default_altitude_acceptance_radius();
+
+	/**
 	 * Get the altitude acceptance radius
 	 *
 	 * @return the distance from the target altitude before considering the waypoint reached
@@ -250,9 +257,12 @@ public:
 	bool		is_planned_mission() const { return _navigation_mode == &_mission; }
 	bool		on_mission_landing() { return _mission.landing(); }
 	bool		start_mission_landing() { return _mission.land_start(); }
+	bool		mission_start_land_available() { return _mission.get_land_start_available(); }
 
 	// RTL
-	bool		mission_landing_required() { return _rtl.mission_landing_required(); }
+	bool		mission_landing_required() { return _rtl.rtl_type() == RTL::RTL_LAND; }
+	int			rtl_type() { return _rtl.rtl_type(); }
+	bool		in_rtl_state() const { return _vstatus.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_RTL; }
 
 	bool		abort_landing();
 
@@ -268,7 +278,6 @@ public:
 	bool		force_vtol();
 
 private:
-
 	int		_fw_pos_ctrl_status_sub{-1};	/**< notification of vehicle capabilities updates */
 	int		_global_pos_sub{-1};		/**< global position subscription */
 	int		_gps_pos_sub{-1};		/**< gps position subscription */
@@ -298,7 +307,7 @@ private:
 	vehicle_land_detected_s				_land_detected{};	/**< vehicle land_detected */
 	vehicle_local_position_s			_local_pos{};		/**< local vehicle position */
 	vehicle_status_s				_vstatus{};		/**< vehicle status */
-
+	uint8_t					_previous_nav_state{}; /**< nav_state of the previous iteration*/
 	// Publications
 	geofence_result_s				_geofence_result{};
 	position_setpoint_triplet_s			_pos_sp_triplet{};	/**< triplet of position setpoints */
@@ -336,6 +345,8 @@ private:
 		(ParamFloat<px4::params::NAV_ACC_RAD>) _param_acceptance_radius,	/**< acceptance for takeoff */
 		(ParamFloat<px4::params::NAV_FW_ALT_RAD>)
 		_param_fw_alt_acceptance_radius,	/**< acceptance radius for fixedwing altitude */
+		(ParamFloat<px4::params::NAV_FW_ALTL_RAD>)
+		_param_fw_alt_lnd_acceptance_radius,	/**< acceptance radius for fixedwing altitude before landing*/
 		(ParamFloat<px4::params::NAV_MC_ALT_RAD>)
 		_param_mc_alt_acceptance_radius,	/**< acceptance radius for multicopter altitude */
 		(ParamInt<px4::params::NAV_FORCE_VT>) _param_force_vtol,	/**< acceptance radius for multicopter altitude */

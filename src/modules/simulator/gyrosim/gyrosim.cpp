@@ -155,7 +155,6 @@ private:
 	float			_accel_range_m_s2;
 	orb_advert_t		_accel_topic;
 	int			_accel_orb_class_instance;
-	int			_accel_class_instance;
 
 	ringbuffer::RingBuffer	*_gyro_reports;
 
@@ -171,8 +170,6 @@ private:
 
 	Integrator _accel_int;
 	Integrator _gyro_int;
-
-	enum Rotation		_rotation;
 
 	// last temperature reading for print_info()
 	float			_last_temperature;
@@ -225,28 +222,14 @@ private:
 	 */
 	int 			self_test();
 
-	/**
-	 * Accel self test
-	 *
-	 * @return 0 on success, 1 on failure
-	 */
-	int 			accel_self_test();
-
-	/**
-	 * Gyro self test
-	 *
-	 * @return 0 on success, 1 on failure
-	 */
-	int 			gyro_self_test();
-
 	/*
 	  set sample rate (approximate) - 1kHz to 5Hz
 	*/
 	void _set_sample_rate(unsigned desired_sample_rate_hz);
 
 	/* do not allow to copy this class due to pointer data members */
-	GYROSIM(const GYROSIM &);
-	GYROSIM operator=(const GYROSIM &);
+	GYROSIM(const GYROSIM &) = delete;
+	GYROSIM operator=(const GYROSIM &) = delete;
 
 #pragma pack(push, 1)
 	/**
@@ -278,7 +261,7 @@ class GYROSIM_gyro  : public VirtDevObj
 {
 public:
 	GYROSIM_gyro(GYROSIM *parent, const char *path);
-	virtual ~GYROSIM_gyro() {}
+	virtual ~GYROSIM_gyro() = default;
 
 	virtual ssize_t		devRead(void *buffer, size_t buflen);
 	virtual int		devIOCTL(unsigned long cmd, unsigned long arg);
@@ -295,8 +278,8 @@ private:
 	int			_gyro_orb_class_instance;
 
 	/* do not allow to copy this class due to pointer data members */
-	GYROSIM_gyro(const GYROSIM_gyro &);
-	GYROSIM_gyro operator=(const GYROSIM_gyro &);
+	GYROSIM_gyro(const GYROSIM_gyro &) = delete;
+	GYROSIM_gyro operator=(const GYROSIM_gyro &) = delete;
 };
 
 /** driver 'main' command */
@@ -312,7 +295,6 @@ GYROSIM::GYROSIM(const char *path_accel, const char *path_gyro, enum Rotation ro
 	_accel_range_m_s2(0.0f),
 	_accel_topic(nullptr),
 	_accel_orb_class_instance(-1),
-	_accel_class_instance(-1),
 	_gyro_reports(nullptr),
 	_gyro_scale{},
 	_gyro_range_scale(0.0f),
@@ -324,7 +306,6 @@ GYROSIM::GYROSIM(const char *path_accel, const char *path_gyro, enum Rotation ro
 	_reset_retries(perf_alloc(PC_COUNT, "gyrosim_reset_retries")),
 	_accel_int(1000000 / GYROSIM_ACCEL_DEFAULT_RATE, true),
 	_gyro_int(1000000 / GYROSIM_GYRO_DEFAULT_RATE, true),
-	_rotation(rotation),
 	_last_temperature(0)
 {
 
@@ -604,69 +585,6 @@ GYROSIM::self_test()
 	return (perf_event_count(_sample_perf) > 0) ? 0 : 1;
 }
 
-int
-GYROSIM::accel_self_test()
-{
-	return OK;
-
-	if (self_test()) {
-		return 1;
-	}
-
-	return 0;
-}
-
-int
-GYROSIM::gyro_self_test()
-{
-	return OK;
-
-	if (self_test()) {
-		return 1;
-	}
-
-	/*
-	 * Maximum deviation of 20 degrees, according to
-	 * http://www.invensense.com/mems/gyro/documents/PS-MPU-6000A-00v3.4.pdf
-	 * Section 6.1, initial ZRO tolerance
-	 */
-	const float max_offset = 0.34f;
-	/* 30% scale error is chosen to catch completely faulty units but
-	 * to let some slight scale error pass. Requires a rate table or correlation
-	 * with mag rotations + data fit to
-	 * calibrate properly and is not done by default.
-	 */
-	const float max_scale = 0.3f;
-
-	/* evaluate gyro offsets, complain if offset -> zero or larger than 20 dps. */
-	if (fabsf(_gyro_scale.x_offset) > max_offset) {
-		return 1;
-	}
-
-	/* evaluate gyro scale, complain if off by more than 30% */
-	if (fabsf(_gyro_scale.x_scale - 1.0f) > max_scale) {
-		return 1;
-	}
-
-	if (fabsf(_gyro_scale.y_offset) > max_offset) {
-		return 1;
-	}
-
-	if (fabsf(_gyro_scale.y_scale - 1.0f) > max_scale) {
-		return 1;
-	}
-
-	if (fabsf(_gyro_scale.z_offset) > max_offset) {
-		return 1;
-	}
-
-	if (fabsf(_gyro_scale.z_scale - 1.0f) > max_scale) {
-		return 1;
-	}
-
-	return 0;
-}
-
 ssize_t
 GYROSIM::gyro_read(void *buffer, size_t buflen)
 {
@@ -817,9 +735,6 @@ GYROSIM::devIOCTL(unsigned long cmd, unsigned long arg)
 	case ACCELIOCGRANGE:
 		return (unsigned long)((_accel_range_m_s2) / CONSTANTS_ONE_G + 0.5f);
 
-	case ACCELIOCSELFTEST:
-		return accel_self_test();
-
 	default:
 		/* give it to the superclass */
 		return VirtDevObj::devIOCTL(cmd, arg);
@@ -876,9 +791,6 @@ GYROSIM::gyro_ioctl(unsigned long cmd, unsigned long arg)
 
 	case GYROIOCGRANGE:
 		return (unsigned long)(_gyro_range_rad_s * 180.0f / M_PI_F + 0.5f);
-
-	case GYROIOCSELFTEST:
-		return gyro_self_test();
 
 	default:
 		/* give it to the superclass */
@@ -1038,11 +950,9 @@ GYROSIM::_measure()
 	arb.z_raw = (int16_t)(mpu_report.accel_z / _accel_range_scale);
 
 	arb.scaling = _accel_range_scale;
-	arb.range_m_s2 = _accel_range_m_s2;
 
 	_last_temperature = mpu_report.temp;
 
-	arb.temperature_raw = (int16_t)((mpu_report.temp - 35.0f) * 361.0f);
 	arb.temperature = _last_temperature;
 
 	arb.x = mpu_report.accel_x;
@@ -1065,9 +975,7 @@ GYROSIM::_measure()
 	grb.z_raw = (int16_t)(mpu_report.gyro_z / _gyro_range_scale);
 
 	grb.scaling = _gyro_range_scale;
-	grb.range_rad_s = _gyro_range_rad_s;
 
-	grb.temperature_raw = (int16_t)((mpu_report.temp - 35.0f) * 361.0f);
 	grb.temperature = _last_temperature;
 
 	grb.x = mpu_report.gyro_x;
@@ -1327,8 +1235,6 @@ test()
 	PX4_INFO("acc  x:  \t%d\traw 0x%0x", (short)a_report.x_raw, (unsigned short)a_report.x_raw);
 	PX4_INFO("acc  y:  \t%d\traw 0x%0x", (short)a_report.y_raw, (unsigned short)a_report.y_raw);
 	PX4_INFO("acc  z:  \t%d\traw 0x%0x", (short)a_report.z_raw, (unsigned short)a_report.z_raw);
-	PX4_INFO("acc range: %8.4f m/s^2 (%8.4f g)", (double)a_report.range_m_s2,
-		 (double)(a_report.range_m_s2 / CONSTANTS_ONE_G));
 
 	/* do a simple demand read */
 	sz = h_gyro.read(&g_report, sizeof(g_report));
@@ -1345,11 +1251,8 @@ test()
 	PX4_INFO("gyro x: \t%d\traw", (int)g_report.x_raw);
 	PX4_INFO("gyro y: \t%d\traw", (int)g_report.y_raw);
 	PX4_INFO("gyro z: \t%d\traw", (int)g_report.z_raw);
-	PX4_INFO("gyro range: %8.4f rad/s (%d deg/s)", (double)g_report.range_rad_s,
-		 (int)((g_report.range_rad_s / M_PI_F) * 180.0f + 0.5f));
 
 	PX4_INFO("temp:  \t%8.4f\tdeg celsius", (double)a_report.temperature);
-	PX4_INFO("temp:  \t%d\traw 0x%0x", (short)a_report.temperature_raw, (unsigned short)a_report.temperature_raw);
 
 
 	/* XXX add poll-rate tests here too */

@@ -161,6 +161,12 @@ public:
 
 private:
 
+	enum class PrintLoadReason {
+		Preflight,
+		Postflight,
+		Watchdog
+	};
+
 	/**
 	 * Write an ADD_LOGGED_MSG to the log for a all current subscriptions and instances
 	 */
@@ -297,21 +303,17 @@ private:
 	/**
 	 * initialize the output for the process load, so that ~1 second later it will be written to the log
 	 */
-	void initialize_load_output();
+	void initialize_load_output(PrintLoadReason reason);
 
 	/**
 	 * write the process load, which was previously initialized with initialize_load_output()
 	 */
-	void write_load_output(bool preflight);
+	void write_load_output();
 
 
 	static constexpr size_t 	MAX_TOPICS_NUM = 64; /**< Maximum number of logged topics */
 	static constexpr unsigned	MAX_NO_LOGFILE = 999;	/**< Maximum number of log files */
-#if defined(__PX4_POSIX_EAGLE) || defined(__PX4_POSIX_EXCELSIOR)
-	static constexpr const char	*LOG_ROOT = PX4_ROOTFSDIR"/log";
-#else
-	static constexpr const char 	*LOG_ROOT = PX4_ROOTFSDIR"/fs/microsd/log";
-#endif
+	static constexpr const char	*LOG_ROOT = PX4_STORAGEDIR "/log";
 
 	uint8_t						*_msg_buffer{nullptr};
 	int						_msg_buffer_len{0};
@@ -344,6 +346,7 @@ private:
 											will be stopped after load printing */
 	print_load_s					_load{}; ///< process load data
 	hrt_abstime					_next_load_print{0}; ///< timestamp when to print the process load
+	PrintLoadReason					_print_load_reason;
 
 	// control
 	param_t						_sdlog_profile_handle{PARAM_INVALID};

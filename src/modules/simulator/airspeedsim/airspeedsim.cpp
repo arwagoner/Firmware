@@ -54,7 +54,6 @@
 #include <math.h>
 #include <unistd.h>
 
-#include <systemlib/airspeed.h>
 #include <systemlib/err.h>
 #include <parameters/param.h>
 #include <perf/perf_counter.h>
@@ -65,33 +64,25 @@
 
 #include <uORB/uORB.h>
 #include <uORB/topics/differential_pressure.h>
-#include <uORB/topics/subsystem_info.h>
 
 #include <simulator/simulator.h>
 
 #include "airspeedsim.h"
 
 AirspeedSim::AirspeedSim(int bus, int address, unsigned conversion_interval, const char *path) :
-	CDev("AIRSPEEDSIM", path),
+	CDev(path),
 	_reports(nullptr),
 	_retries(0),
 	_sensor_ok(false),
-	_last_published_sensor_ok(true), /* initialize differently to force publication */
 	_measure_ticks(0),
 	_collect_phase(false),
 	_diff_pres_offset(0.0f),
 	_airspeed_pub(nullptr),
-	_subsys_pub(nullptr),
 	_class_instance(-1),
 	_conversion_interval(conversion_interval),
 	_sample_perf(perf_alloc(PC_ELAPSED, "airspeed_read")),
 	_comms_errors(perf_alloc(PC_COUNT, "airspeed_comms_errors"))
 {
-	// enable debug() calls
-	_debug_enabled = false;
-
-	// work_cancel in the dtor will explode if we don't do this...
-	memset(&_work, 0, sizeof(_work));
 }
 
 AirspeedSim::~AirspeedSim()
@@ -120,7 +111,7 @@ AirspeedSim::init()
 
 	/* init base class */
 	if (CDev::init() != OK) {
-		DEVICE_DEBUG("CDev init failed");
+		PX4_ERR("CDev init failed");
 		goto out;
 	}
 
@@ -135,7 +126,7 @@ AirspeedSim::init()
 	_class_instance = register_class_devname(AIRSPEED_BASE_DEVICE_PATH);
 
 	/* publication init */
-	if (_class_instance == CLASS_DEVICE_PRIMARY) {
+	if (_class_instance == 0) {
 
 		/* advertise sensor topic, measure manually to initialize valid report */
 		struct differential_pressure_s arp;
@@ -172,7 +163,7 @@ AirspeedSim::probe()
 }
 
 int
-AirspeedSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
+AirspeedSim::ioctl(cdev::file_t *filp, int cmd, unsigned long arg)
 {
 	switch (cmd) {
 
@@ -215,7 +206,7 @@ AirspeedSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 					bool want_start = (_measure_ticks == 0);
 
 					/* convert hz to tick interval via microseconds */
-					unsigned long ticks = USEC2TICK(1000000 / arg);
+					int ticks = USEC2TICK(1000000 / arg);
 
 					/* check against maximum rate */
 					if (ticks < USEC2TICK(_conversion_interval)) {
@@ -284,7 +275,7 @@ AirspeedSim::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 }
 
 ssize_t
-AirspeedSim::read(device::file_t *filp, char *buffer, size_t buflen)
+AirspeedSim::read(cdev::file_t *filp, char *buffer, size_t buflen)
 {
 	unsigned count = buflen / sizeof(differential_pressure_s);
 	differential_pressure_s *abuf = reinterpret_cast<differential_pressure_s *>(buffer);
@@ -361,37 +352,11 @@ AirspeedSim::stop()
 }
 
 void
-AirspeedSim::update_status()
-{
-	if (_sensor_ok != _last_published_sensor_ok) {
-		/* notify about state change */
-		struct subsystem_info_s info = {};
-		info.present = true;
-		info.enabled = true;
-		info.ok = _sensor_ok;
-		info.subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_DIFFPRESSURE;
-
-		if (_subsys_pub != nullptr) {
-			orb_publish(ORB_ID(subsystem_info), _subsys_pub, &info);
-
-		} else {
-			_subsys_pub = orb_advertise(ORB_ID(subsystem_info), &info);
-		}
-
-		_last_published_sensor_ok = _sensor_ok;
-	}
-}
-
-void
 AirspeedSim::cycle_trampoline(void *arg)
 {
 	AirspeedSim *dev = (AirspeedSim *)arg;
 
 	dev->cycle();
-	// XXX we do not know if this is
-	// really helping - do not update the
-	// subsys state right now
-	//dev->update_status();
 }
 
 void

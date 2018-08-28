@@ -116,7 +116,7 @@
 #include <sam_tc.h>
 
 #include <systemlib/err.h>
-#include <systemlib/circuit_breaker.h>
+#include <circuit_breaker/circuit_breaker.h>
 
 /* Check that tone alarm and HRT timers are different */
 #if defined(TONE_ALARM_CHANNEL)  && defined(HRT_TIMER_CHANNEL)
@@ -208,11 +208,11 @@
 
 #define CBRK_BUZZER_KEY 782097
 
-class ToneAlarm : public device::CDev
+class ToneAlarm : public cdev::CDev
 {
 public:
 	ToneAlarm();
-	~ToneAlarm();
+	~ToneAlarm() = default;
 
 	virtual int		init();
 
@@ -313,7 +313,7 @@ extern "C" __EXPORT int tone_alarm_main(int argc, char *argv[]);
 
 
 ToneAlarm::ToneAlarm() :
-	CDev("tone_alarm", TONEALARM0_DEVICE_PATH),
+	CDev(TONEALARM0_DEVICE_PATH),
 	_default_tune_number(0),
 	_user_tune(nullptr),
 	_tune(nullptr),
@@ -355,10 +355,6 @@ ToneAlarm::ToneAlarm() :
 	_tune_names[TONE_HOME_SET] = "home_set";
 }
 
-ToneAlarm::~ToneAlarm()
-{
-}
-
 int
 ToneAlarm::init()
 {
@@ -397,7 +393,7 @@ ToneAlarm::init()
 	/* make sure the timer is running */
 	rCR1 = GTIM_CR1_CEN;
 #endif
-	DEVICE_DEBUG("ready");
+
 	return OK;
 }
 
@@ -807,14 +803,14 @@ ToneAlarm::ioctl(file *filp, int cmd, unsigned long arg)
 {
 	int result = OK;
 
-	DEVICE_DEBUG("ioctl %i %u", cmd, arg);
+	PX4_DEBUG("ioctl %i %u", cmd, arg);
 
 //	irqstate_t flags = enter_critical_section();
 
 	/* decide whether to increase the alarm level to cmd or leave it alone */
 	switch (cmd) {
 	case TONE_SET_ALARM:
-		DEVICE_DEBUG("TONE_SET_ALARM %u", arg);
+		PX4_DEBUG("TONE_SET_ALARM %u", arg);
 
 		if (arg < TONE_NUMBER_OF_TUNES) {
 			if (arg == TONE_STOP_TUNE) {

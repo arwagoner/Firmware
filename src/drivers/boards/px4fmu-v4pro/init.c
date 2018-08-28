@@ -79,7 +79,6 @@
 
 #include <systemlib/hardfault_log.h>
 
-#include <systemlib/systemlib.h>
 #include <parameters/param.h>
 
 /****************************************************************************
@@ -227,6 +226,13 @@ stm32_boardinitialize(void)
 	stm32_configgpio(GPIO_ADC1_IN4);	/* VDD_5V_SENS */
 	stm32_configgpio(GPIO_ADC1_IN11);	/* BATT2_VOLTAGE_SENS */
 	stm32_configgpio(GPIO_ADC1_IN13);	/* BATT2_CURRENT_SENS */
+
+	/* configure CAN interfaces */
+
+	stm32_configgpio(GPIO_CAN1_RX);
+	stm32_configgpio(GPIO_CAN1_TX);
+	stm32_configgpio(GPIO_CAN2_RX);
+	stm32_configgpio(GPIO_CAN2_TX);
 
 	/* configure power supply control/sense pins */
 	stm32_configgpio(GPIO_VDD_3V3_PERIPH_EN);

@@ -211,6 +211,7 @@ private:
 	hrt_abstime _time_last_t_alt{0};			///< time at which we had last valid terrain alt */
 
 	float _flare_height{0.0f};				///< estimated height to ground at which flare started */
+	float _flare_pitch_sp{0.0f};			///< Current forced (i.e. not determined using TECS) flare pitch setpoint */
 	float _flare_curve_alt_rel_last{0.0f};
 	float _target_bearing{0.0f};				///< estimated height to ground at which flare started */
 
@@ -266,6 +267,7 @@ private:
 		float max_climb_rate;
 		float max_sink_rate;
 		float speed_weight;
+		float time_const_throt;
 
 		float airspeed_min;
 		float airspeed_trim;
@@ -292,7 +294,9 @@ private:
 		float land_flare_pitch_min_deg;
 		float land_flare_pitch_max_deg;
 		int32_t land_use_terrain_estimate;
+		int32_t land_early_config_change;
 		float land_airspeed_scale;
+		float land_throtTC_scale;
 
 		// VTOL
 		float airspeed_trans;
@@ -305,6 +309,7 @@ private:
 		param_t l1_period;
 		param_t l1_damping;
 		param_t roll_limit;
+		param_t roll_slew_deg_sec;
 
 		param_t time_const;
 		param_t time_const_throt;
@@ -354,7 +359,9 @@ private:
 		param_t land_flare_pitch_min_deg;
 		param_t land_flare_pitch_max_deg;
 		param_t land_use_terrain_estimate;
+		param_t land_early_config_change;
 		param_t land_airspeed_scale;
+		param_t land_throtTC_scale;
 
 		param_t vtol_type;
 	} _parameter_handles {};				///< handles for interesting parameters */
@@ -416,7 +423,7 @@ private:
 	bool		update_desired_altitude(float dt);
 
 	bool		control_position(const Vector2f &curr_pos, const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev,
-					 const position_setpoint_s &pos_sp_curr);
+					 const position_setpoint_s &pos_sp_curr, const position_setpoint_s &pos_sp_next);
 	void		control_takeoff(const Vector2f &curr_pos, const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev,
 					const position_setpoint_s &pos_sp_curr);
 	void		control_landing(const Vector2f &curr_pos, const Vector2f &ground_speed, const position_setpoint_s &pos_sp_prev,

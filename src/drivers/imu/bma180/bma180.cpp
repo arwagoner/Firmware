@@ -727,7 +727,6 @@ BMA180::measure()
 	report.y = ((report.y_raw * _accel_range_scale) - _accel_scale.y_offset) * _accel_scale.y_scale;
 	report.z = ((report.z_raw * _accel_range_scale) - _accel_scale.z_offset) * _accel_scale.z_scale;
 	report.scaling = _accel_range_scale;
-	report.range_m_s2 = _accel_range_m_s2;
 
 	_reports->force(&report);
 
@@ -890,9 +889,12 @@ info()
 int
 bma180_main(int argc, char *argv[])
 {
+	if (argc < 2) {
+		goto out_error;
+	}
+
 	/*
 	 * Start/load the driver.
-
 	 */
 	if (!strcmp(argv[1], "start")) {
 		bma180::start();
@@ -919,5 +921,6 @@ bma180_main(int argc, char *argv[])
 		bma180::info();
 	}
 
+out_error:
 	errx(1, "unrecognised command, try 'start', 'test', 'reset' or 'info'");
 }

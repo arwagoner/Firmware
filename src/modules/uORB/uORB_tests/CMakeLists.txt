@@ -44,8 +44,8 @@ px4_add_module(
 	MODULE modules__uORB__uORB_tests
 	MAIN uorb_tests
 	STACK_MAIN 2048
+	PRIORITY "SCHED_PRIORITY_MAX"
 	COMPILE_FLAGS
-		-Wno-sign-compare # TODO: fix all sign-compare
 	SRCS ${SRCS}
 	DEPENDS
 	)

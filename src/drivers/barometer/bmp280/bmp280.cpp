@@ -50,7 +50,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <unistd.h>
-#include <getopt.h>
+#include <px4_getopt.h>
 #include <px4_log.h>
 
 #include <nuttx/arch.h>
@@ -61,7 +61,7 @@
 #include <board_config.h>
 #include "bmp280.h"
 
-#include <drivers/device/device.h>
+#include <lib/cdev/CDev.hpp>
 #include <drivers/drv_baro.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/device/ringbuffer.h>
@@ -86,7 +86,7 @@ enum BMP280_BUS {
  * BMP280 internal constants and data structures.
  */
 
-class BMP280 : public device::CDev
+class BMP280 : public cdev::CDev
 {
 public:
 	BMP280(bmp280::IBMP280 *interface, const char *path);
@@ -148,7 +148,7 @@ private:
 extern "C" __EXPORT int bmp280_main(int argc, char *argv[]);
 
 BMP280::BMP280(bmp280::IBMP280 *interface, const char *path) :
-	CDev("BMP280", path),
+	CDev(path),
 	_interface(interface),
 	_running(false),
 	_report_ticks(0),
@@ -194,12 +194,10 @@ BMP280::~BMP280()
 int
 BMP280::init()
 {
-	int ret;
-
-	ret = CDev::init();
+	int ret = CDev::init();
 
 	if (ret != OK) {
-		DEVICE_DEBUG("CDev init failed");
+		PX4_ERR("CDev init failed");
 		return ret;
 	}
 
@@ -207,7 +205,7 @@ BMP280::init()
 	_reports = new ringbuffer::RingBuffer(2, sizeof(baro_report));
 
 	if (_reports == nullptr) {
-		DEVICE_DEBUG("can't get memory for reports");
+		PX4_ERR("can't get memory for reports");
 		ret = -ENOMEM;
 		return ret;
 	}
@@ -535,10 +533,7 @@ BMP280::collect()
 	report.pressure = _P / 100.0f; // to mbar
 
 	/* publish it */
-	if (!(_pub_blocked)) {
-		/* publish it */
-		orb_publish(ORB_ID(sensor_baro), _baro_topic, &report);
-	}
+	orb_publish(ORB_ID(sensor_baro), _baro_topic, &report);
 
 	_reports->force(&report);
 
@@ -584,8 +579,12 @@ struct bmp280_bus_option {
 #if defined(PX4_SPIDEV_EXT_BARO) && defined(PX4_SPI_BUS_EXT)
 	{ BMP280_BUS_SPI_EXTERNAL, "/dev/bmp280_spi_ext", &bmp280_spi_interface, PX4_SPI_BUS_EXT, PX4_SPIDEV_EXT_BARO, true, NULL },
 #endif
-#ifdef PX4_SPIDEV_BARO
+#if defined(PX4_SPIDEV_BARO)
+#  if defined(PX4_SPIDEV_BARO_BUS)
+	{ BMP280_BUS_SPI_INTERNAL, "/dev/bmp280_spi_int", &bmp280_spi_interface, PX4_SPIDEV_BARO_BUS, PX4_SPIDEV_BARO, false, NULL },
+#  else
 	{ BMP280_BUS_SPI_INTERNAL, "/dev/bmp280_spi_int", &bmp280_spi_interface, PX4_SPI_BUS_SENSORS, PX4_SPIDEV_BARO, false, NULL },
+#  endif
 #endif
 #ifdef PX4_I2C_OBDEV_BMP280
 	{ BMP280_BUS_I2C_INTERNAL, "/dev/bmp280_i2c_int", &bmp280_i2c_interface, PX4_I2C_BUS_EXPANSION, PX4_I2C_OBDEV_BMP280, false, NULL },
@@ -845,11 +844,12 @@ usage()
 int
 bmp280_main(int argc, char *argv[])
 {
-	enum BMP280_BUS busid = BMP280_BUS_ALL;
+	int myoptind = 1;
 	int ch;
+	const char *myoptarg = nullptr;
+	enum BMP280_BUS busid = BMP280_BUS_ALL;
 
-	/* jump over start/off/etc and look at options first */
-	while ((ch = getopt(argc, argv, "XISs")) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "XISs", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
 		case 'X':
 			busid = BMP280_BUS_I2C_EXTERNAL;
@@ -857,8 +857,6 @@ bmp280_main(int argc, char *argv[])
 
 		case 'I':
 			busid = BMP280_BUS_I2C_INTERNAL;
-			//PX4_ERR("not supported yet");
-			//exit(1);
 			break;
 
 		case 'S':
@@ -871,11 +869,16 @@ bmp280_main(int argc, char *argv[])
 
 		default:
 			bmp280::usage();
-			exit(0);
+			return 0;
 		}
 	}
 
-	const char *verb = argv[optind];
+	if (myoptind >= argc) {
+		bmp280::usage();
+		return -1;
+	}
+
+	const char *verb = argv[myoptind];
 
 	/*
 	 * Start/load the driver.
@@ -906,5 +909,5 @@ bmp280_main(int argc, char *argv[])
 	}
 
 	PX4_ERR("unrecognized command, try 'start', 'test', 'reset' or 'info'");
-	exit(1);
+	return -1;
 }
